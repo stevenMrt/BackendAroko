@@ -1,0 +1,16 @@
+node_modules/
+npm-debug.log*
+.git/
+.git
+.env
+.env.*
+!.env.example
+!.env.production.example
+uploads/
+*.log
+logs/
+Dockerfile
+.dockerignore
+.gitignore
+pm2*.json
+ecosystem.config.js
