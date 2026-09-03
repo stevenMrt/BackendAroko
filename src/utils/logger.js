@@ -1,13 +1,7 @@
 import winston from 'winston';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const isProduction = process.env.NODE_ENV === 'production';
-
-const logDir = path.join(process.cwd(), 'logs');
 
 const logger = winston.createLogger({
   level: isProduction ? 'info' : 'debug',
@@ -33,7 +27,10 @@ const logger = winston.createLogger({
   ],
 });
 
-if (isProduction) {
+// Solo escribir logs a archivos en desarrollo local
+// En producción/contenedores: stdout/stderr via Console (capturado por el orquestador)
+if (!isProduction) {
+  const logDir = path.join(process.cwd(), 'logs');
   logger.add(new winston.transports.File({
     dirname: logDir,
     filename: 'error.log',

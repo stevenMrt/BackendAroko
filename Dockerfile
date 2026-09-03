@@ -8,6 +8,10 @@ RUN npm ci --only=production
 
 COPY . .
 
+# Crear directorio de uploads con permisos para el usuario node
+RUN mkdir -p uploads/productos uploads/compras uploads/comprobantes uploads/comprobantes-pago && \
+    chown -R node:node /app
+
 ENV NODE_ENV=production
 
 USER node
