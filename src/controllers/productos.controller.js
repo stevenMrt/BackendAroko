@@ -410,9 +410,10 @@ export const obtenerProducto = async (req, res) => {
       return res.status(404).json({ ok: false, message: 'Producto no encontrado.' });
     }
 
+const imagenes = buildImageArray(rows[0].imagen);
     return res.status(200).json({
       ok: true,
-      data: { ...rows[0], imagen: buildImageUrl(rows[0].imagen) },
+      data: { ...rows[0], imagen: imagenes[0] || null, imagenes: imagenes },
     });
 
   } catch (error) {
@@ -470,7 +471,7 @@ export const crearProducto = async (req, res) => {
     );
 
     if (dup.length > 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(409).json({
         ok: false,
         message: 'El producto ya existe.'
@@ -489,7 +490,7 @@ export const crearProducto = async (req, res) => {
     );
 
     if (!resultado.rows || resultado.rows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       logger.error('�R INSERT no retornó filas');
       return res.status(500).json({
         ok: false,
@@ -500,7 +501,7 @@ export const crearProducto = async (req, res) => {
     const productoId = resultado.rows[0].id_producto;
 
     if (!productoId) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(500).json({ ok: false, message: 'Error al crear producto: ID vacío.' });
     }
 
@@ -538,7 +539,7 @@ export const crearProducto = async (req, res) => {
     });
 
   } catch (error) {
-    try { await client.query('ROLLBACK'); } catch { /* ignorar */ }
+    try { await client.query('ROLLBACK').catch(() => {}); } catch { /* ignorar */ }
     logger.error('Error al crear producto:', error.message);
     return res.status(500).json({ ok: false, message: error.message || 'Error al crear producto.', code: error.code });
   } finally {
@@ -583,7 +584,7 @@ export const editarProducto = async (req, res) => {
 
     if (actual.rows.length === 0) {
 
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
 
       return res.status(404).json({
         ok: false,
@@ -612,7 +613,7 @@ export const editarProducto = async (req, res) => {
 
     if (dup.length > 0) {
 
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
 
       return res.status(409).json({
         ok: false,
@@ -675,7 +676,7 @@ export const editarProducto = async (req, res) => {
 
   } catch (error) {
 
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
 
     logger.error(
       'Error al editar producto:',

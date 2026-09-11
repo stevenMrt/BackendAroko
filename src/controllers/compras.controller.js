@@ -7,10 +7,11 @@ import {
   sumarStockConAuditoria,
   restarStockConAuditoria,
 } from '../services/inventario.service.js';
+import { buildImageUrl } from '../services/productos.service.js';
 
-// ������������������������������������������������������������������������������������������
+//                                              
 // Utilidad interna
-// ������������������������������������������������������������������������������������������
+//                                              
 function calcularTotales(detalle, iva = 19) {
   const subtotalBase = detalle.reduce((acc, d) => acc + parseFloat(d.subtotal), 0);
   const ivaValor     = subtotalBase * (parseFloat(iva) / 100);
@@ -37,16 +38,21 @@ export const listarCompras = async (req, res) => {
       rows = rows.filter((c) => c.proveedor_id === parseInt(proveedor_id));
     }
 
-    return res.status(200).json({ ok: true, data: rows });
+    const data = rows.map((c) => ({
+      ...c,
+      foto_factura: buildImageUrl(c.foto_factura),
+    }));
+
+    return res.status(200).json({ ok: true, data });
   } catch (error) {
     logger.error('Error al listar compras:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al listar compras.' });
   }
 };
 
-// ������������������������������������������������������������������������������������������
+//                                              
 // GET /api/compras/:id
-// ������������������������������������������������������������������������������������������
+//                                              
 export const obtenerCompra = async (req, res) => {
   const { id } = req.params;
   try {
@@ -54,14 +60,18 @@ export const obtenerCompra = async (req, res) => {
     if (!rows.length) {
       return res.status(404).json({ ok: false, message: 'Compra no encontrada.' });
     }
-    return res.status(200).json({ ok: true, data: rows[0] });
+    const compra = {
+      ...rows[0],
+      foto_factura: buildImageUrl(rows[0].foto_factura),
+    };
+    return res.status(200).json({ ok: true, data: compra });
   } catch (error) {
     logger.error('Error al obtener compra:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al cargar el detalle de la compra.' });
   }
 };
 
-// ������������������������������������������������������������������������������������������
+//                                              
 // POST /api/compras
 // Body: { proveedor_id, empleado_id, numero_factura, iva, detalle: [
 //   { insumo_id?, nombre_insumo, cantidad, precio, categoria_id?, unidad_medida? }

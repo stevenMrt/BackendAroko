@@ -35,7 +35,7 @@ export const VENTAS_QUERIES = {
       c.nombre          AS cliente_nombre,
       v.empleado_id,
       e.nombre          AS empleado_nombre,
-      v.fecha_venta,
+      COALESCE(v.fecha_venta, v.fecha) AS fecha_venta,
       v.total,
       v.abonado,
       v.saldo,
@@ -46,6 +46,7 @@ export const VENTAS_QUERIES = {
           JSON_BUILD_OBJECT(
             'producto_id', dv.producto_id,
             'nombre',      p.nombre,
+            'imagen',      p.imagen,
             'cantidad',    dv.cantidad,
             'precio',      dv.precio,
             'subtotal',    dv.subtotal
@@ -59,7 +60,7 @@ export const VENTAS_QUERIES = {
     LEFT JOIN detalle_venta dv ON dv.venta_id    = v.id_venta
     LEFT JOIN productos      p ON p.id_producto  = dv.producto_id
     GROUP BY v.id_venta, c.nombre, e.nombre
-    ORDER BY v.fecha_venta DESC, v.id_venta DESC
+    ORDER BY COALESCE(v.fecha_venta, v.fecha) DESC, v.id_venta DESC
   `,
 
   SEARCH: `
@@ -71,7 +72,7 @@ export const VENTAS_QUERIES = {
       c.nombre          AS cliente_nombre,
       v.empleado_id,
       e.nombre          AS empleado_nombre,
-      v.fecha_venta,
+      COALESCE(v.fecha_venta, v.fecha) AS fecha_venta,
       v.total,
       v.abonado,
       v.saldo,
@@ -82,6 +83,7 @@ export const VENTAS_QUERIES = {
           JSON_BUILD_OBJECT(
             'producto_id', dv.producto_id,
             'nombre',      p.nombre,
+            'imagen',      p.imagen,
             'cantidad',    dv.cantidad,
             'precio',      dv.precio,
             'subtotal',    dv.subtotal
@@ -96,7 +98,7 @@ export const VENTAS_QUERIES = {
     LEFT JOIN productos      p ON p.id_producto  = dv.producto_id
     WHERE v.numero_venta ILIKE $1 OR c.nombre ILIKE $1
     GROUP BY v.id_venta, c.nombre, e.nombre
-    ORDER BY v.fecha_venta DESC
+    ORDER BY COALESCE(v.fecha_venta, v.fecha) DESC
   `,
 
   FILTER_ESTADO: `
@@ -108,7 +110,7 @@ export const VENTAS_QUERIES = {
       c.nombre          AS cliente_nombre,
       v.empleado_id,
       e.nombre          AS empleado_nombre,
-      v.fecha_venta,
+      COALESCE(v.fecha_venta, v.fecha) AS fecha_venta,
       v.total,
       v.abonado,
       v.saldo,
@@ -119,6 +121,7 @@ export const VENTAS_QUERIES = {
           JSON_BUILD_OBJECT(
             'producto_id', dv.producto_id,
             'nombre',      p.nombre,
+            'imagen',      p.imagen,
             'cantidad',    dv.cantidad,
             'precio',      dv.precio,
             'subtotal',    dv.subtotal
@@ -133,7 +136,7 @@ export const VENTAS_QUERIES = {
     LEFT JOIN productos      p ON p.id_producto  = dv.producto_id
     WHERE v.estado = $1
     GROUP BY v.id_venta, c.nombre, e.nombre
-    ORDER BY v.fecha_venta DESC
+    ORDER BY COALESCE(v.fecha_venta, v.fecha) DESC
   `,
 
   FILTER_FECHAS: `
@@ -145,7 +148,7 @@ export const VENTAS_QUERIES = {
       c.nombre          AS cliente_nombre,
       v.empleado_id,
       e.nombre          AS empleado_nombre,
-      v.fecha_venta,
+      COALESCE(v.fecha_venta, v.fecha) AS fecha_venta,
       v.total,
       v.abonado,
       v.saldo,
@@ -156,6 +159,7 @@ export const VENTAS_QUERIES = {
           JSON_BUILD_OBJECT(
             'producto_id', dv.producto_id,
             'nombre',      p.nombre,
+            'imagen',      p.imagen,
             'cantidad',    dv.cantidad,
             'precio',      dv.precio,
             'subtotal',    dv.subtotal
@@ -168,9 +172,9 @@ export const VENTAS_QUERIES = {
     LEFT JOIN empleados e ON e.id_empleado = v.empleado_id
     LEFT JOIN detalle_venta dv ON dv.venta_id    = v.id_venta
     LEFT JOIN productos      p ON p.id_producto  = dv.producto_id
-    WHERE v.fecha_venta BETWEEN $1 AND $2
+    WHERE COALESCE(v.fecha_venta, v.fecha) BETWEEN $1 AND $2
     GROUP BY v.id_venta, c.nombre, e.nombre
-    ORDER BY v.fecha_venta DESC
+    ORDER BY COALESCE(v.fecha_venta, v.fecha) DESC
   `,
 
   FIND_BY_ID: `
@@ -182,7 +186,7 @@ export const VENTAS_QUERIES = {
       c.nombre          AS cliente_nombre,
       v.empleado_id,
       e.nombre          AS empleado_nombre,
-      v.fecha_venta,
+      COALESCE(v.fecha_venta, v.fecha) AS fecha_venta,
       v.total,
       v.abonado,
       v.saldo,
@@ -193,6 +197,7 @@ export const VENTAS_QUERIES = {
           JSON_BUILD_OBJECT(
             'producto_id', dv.producto_id,
             'nombre',      p.nombre,
+            'imagen',      p.imagen,
             'cantidad',    dv.cantidad,
             'precio',      dv.precio,
             'subtotal',    dv.subtotal

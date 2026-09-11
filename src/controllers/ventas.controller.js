@@ -4,6 +4,15 @@ import pool from '../config/db.js';
 import { VENTAS_QUERIES, ABONOS_QUERIES } from '../queries/ventas.queries.js';
 import { PRODUCTOS_QUERIES } from '../queries/productos.queries.js';
 import logger from '../utils/logger.js';
+import { buildImageUrl } from '../services/productos.service.js';
+
+function normalizarDetalleVenta(detalle) {
+  if (!Array.isArray(detalle)) return [];
+  return detalle.map((item) => ({
+    ...item,
+    imagen: buildImageUrl(item.imagen),
+  }));
+}
 
 // �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
 //  VENTAS
@@ -27,7 +36,11 @@ export const listarVentas = async (req, res) => {
     if (rows.length === 0) {
       return res.status(200).json({ ok: true, message: 'No hay ventas registradas.', data: [] });
     }
-    return res.status(200).json({ ok: true, data: rows });
+    const data = rows.map((v) => ({
+      ...v,
+      detalle: normalizarDetalleVenta(v.detalle),
+    }));
+    return res.status(200).json({ ok: true, data });
   } catch (error) {
     logger.error('Error al listar ventas:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al listar ventas.' });
@@ -42,7 +55,11 @@ export const obtenerVenta = async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ ok: false, message: 'Venta no encontrada.' });
     }
-    return res.status(200).json({ ok: true, data: rows[0] });
+    const venta = {
+      ...rows[0],
+      detalle: normalizarDetalleVenta(rows[0].detalle),
+    };
+    return res.status(200).json({ ok: true, data: venta });
   } catch (error) {
     return res.status(500).json({ ok: false, message: 'Error al cargar la venta.' });
   }
@@ -57,7 +74,12 @@ export const registrarVenta = async (req, res) => {
     return res.status(400).json({ ok: false, message: 'Campos obligatorios incompletos.' });
   }
 
-  const detalleArr = typeof detalle === 'string' ? JSON.parse(detalle) : detalle;
+  let detalleArr;
+  try {
+    detalleArr = typeof detalle === 'string' ? JSON.parse(detalle) : detalle;
+  } catch {
+    return res.status(400).json({ ok: false, message: 'El formato del detalle de venta no es válido.' });
+  }
   if (!Array.isArray(detalleArr) || detalleArr.length === 0) {
     return res.status(400).json({ ok: false, message: 'La venta debe tener al menos un producto.' });
   }
@@ -73,11 +95,11 @@ export const registrarVenta = async (req, res) => {
         [item.producto_id, 'ACTIVO']
       );
       if (prod.length === 0) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(400).json({ ok: false, message: `Producto ${item.producto_id} no encontrado o inactivo.` });
       }
       if (parseFloat(prod[0].stock_producto) < parseFloat(item.cantidad)) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(400).json({
           ok: false,
           message: `Stock insuficiente para "${prod[0].nombre}". Disponible: ${prod[0].stock_producto}.`,
@@ -122,11 +144,14 @@ export const registrarVenta = async (req, res) => {
     return res.status(201).json({
       ok: true,
       message: 'Venta registrada exitosamente.',
-      data: completo[0],
+      data: {
+        ...completo[0],
+        detalle: normalizarDetalleVenta(completo[0].detalle),
+      },
     });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al registrar venta:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al registrar la venta.' });
   } finally {
@@ -152,7 +177,7 @@ export const anularVenta = async (req, res) => {
     // Anular (solo si está REGISTRADA)
     const { rows } = await client.query(VENTAS_QUERIES.ANULAR, [motivo_anulacion.trim(), id]);
     if (rows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(400).json({ ok: false, message: 'La venta no existe o ya está anulada.' });
     }
 
@@ -170,7 +195,7 @@ export const anularVenta = async (req, res) => {
     });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al anular venta:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al anular la venta.' });
   } finally {
@@ -240,26 +265,26 @@ export const registrarAbono = async (req, res) => {
       'SELECT id_venta, total, abonado, saldo, estado FROM ventas WHERE id_venta = $1', [venta_id]
     );
     if (ventaRows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(404).json({ ok: false, message: 'Venta no encontrada.' });
     }
     const venta = ventaRows[0];
     if (venta.estado !== 'REGISTRADA') {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(400).json({ ok: false, message: 'No se pueden registrar abonos a una venta anulada.' });
     }
 
     // Verificar máximo 3 cuotas activas
     const { rows: cuentaRows } = await client.query(ABONOS_QUERIES.COUNT_CUOTAS, [venta_id]);
     if (parseInt(cuentaRows[0].total) >= 3) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(400).json({ ok: false, message: 'La venta ya tiene el máximo de 3 cuotas registradas.' });
     }
 
     // Verificar que el valor no supere el saldo
     const saldoActual = parseFloat(venta.saldo);
     if (valorNum > saldoActual) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(400).json({
         ok: false,
         message: `El valor ($${valorNum.toLocaleString()}) supera el saldo pendiente ($${saldoActual.toLocaleString()}).`,
@@ -288,7 +313,7 @@ export const registrarAbono = async (req, res) => {
     });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al registrar abono:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al registrar el abono.' });
   } finally {
@@ -309,12 +334,12 @@ export const anularAbono = async (req, res) => {
       'SELECT id_abono, venta_id, valor, estado FROM abonos WHERE id_abono = $1', [id]
     );
     if (abonoRows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(404).json({ ok: false, message: 'Abono no encontrado.' });
     }
     const abono = abonoRows[0];
     if (abono.estado !== 'REGISTRADO') {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(400).json({ ok: false, message: 'El abono ya se encuentra anulado.' });
     }
 
@@ -332,7 +357,7 @@ export const anularAbono = async (req, res) => {
     });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al anular abono:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al anular el abono.' });
   } finally {

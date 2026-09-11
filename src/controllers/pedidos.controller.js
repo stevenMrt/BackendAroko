@@ -1,3 +1,5 @@
+import { VENTAS_QUERIES } from '../queries/ventas.queries.js';
+import { PRODUCTOS_QUERIES } from '../queries/productos.queries.js';
 // src/controllers/pedidos.controller.js
 
 import pool from '../config/db.js';
@@ -73,14 +75,14 @@ export const crearCliente = async (req, res) => {
 
     const { rows: dupDoc } = await client.query(CLIENTES_QUERIES.DOCUMENTO_EXISTS, [numero_documento.trim(), 0]);
     if (dupDoc.length > 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(409).json({ ok: false, message: 'El cliente ya se encuentra registrado.' });
     }
 
     if (email) {
       const { rows: dupEmail } = await client.query(CLIENTES_QUERIES.EMAIL_EXISTS, [email.trim(), 0]);
       if (dupEmail.length > 0) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(409).json({ ok: false, message: 'Ya existe un cliente con ese correo.' });
       }
     }
@@ -94,13 +96,13 @@ export const crearCliente = async (req, res) => {
         [usuarioIdFinal]
       );
       if (rolCheck.length === 0) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(400).json({ ok: false, message: 'El usuario indicado no tiene rol Cliente.' });
       }
       // Verificar que ese usuario no tenga ya un cliente
       const { rows: dupUsr } = await client.query(CLIENTES_QUERIES.FIND_BY_USUARIO_ID, [usuarioIdFinal]);
       if (dupUsr.length > 0) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(409).json({ ok: false, message: 'Ese usuario ya tiene un cliente asociado.' });
       }
     }
@@ -128,7 +130,7 @@ export const crearCliente = async (req, res) => {
     await client.query('COMMIT');
     return res.status(201).json({ ok: true, message: 'Cliente registrado exitosamente.', data: rows[0] });
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al crear cliente:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al registrar el cliente.' });
   } finally {
@@ -151,14 +153,14 @@ export const editarCliente = async (req, res) => {
 
     const { rows: dupDoc } = await client.query(CLIENTES_QUERIES.DOCUMENTO_EXISTS, [numero_documento.trim(), id]);
     if (dupDoc.length > 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(409).json({ ok: false, message: 'Ese documento ya pertenece a otro cliente.' });
     }
 
     if (email) {
       const { rows: dupEmail } = await client.query(CLIENTES_QUERIES.EMAIL_EXISTS, [email.trim(), id]);
       if (dupEmail.length > 0) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(409).json({ ok: false, message: 'Ya existe otro cliente con ese correo.' });
       }
     }
@@ -176,7 +178,7 @@ export const editarCliente = async (req, res) => {
     ]);
 
     if (rows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(404).json({ ok: false, message: 'Cliente no encontrado.' });
     }
 
@@ -196,7 +198,7 @@ export const editarCliente = async (req, res) => {
     await client.query('COMMIT');
     return res.status(200).json({ ok: true, message: 'Cliente actualizado correctamente.', data: rows[0] });
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al editar cliente:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al actualizar el cliente.' });
   } finally {
@@ -275,7 +277,7 @@ export const editarPerfilCliente = async (req, res) => {
       `SELECT id_cliente FROM clientes WHERE usuario_id = $1`, [id_usuario]
     );
     if (cliRows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(404).json({ ok: false, message: 'Perfil no encontrado.' });
     }
     const id_cliente = cliRows[0].id_cliente;
@@ -285,7 +287,7 @@ export const editarPerfilCliente = async (req, res) => {
         CLIENTES_QUERIES.EMAIL_EXISTS, [email.trim(), id_cliente]
       );
       if (dupEmail.length > 0) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(409).json({ ok: false, message: 'Ese correo ya está en uso.' });
       }
     }
@@ -307,7 +309,7 @@ export const editarPerfilCliente = async (req, res) => {
     await client.query('COMMIT');
     return res.status(200).json({ ok: true, message: 'Perfil actualizado correctamente.', data: rows[0] });
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al editar perfil cliente:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al actualizar el perfil.' });
   } finally {
@@ -352,7 +354,7 @@ export const sincronizarClientes = async (req, res) => {
       data: { desvinculados, vinculados, eliminados, creados: sinCliente.length },
     });
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al sincronizar clientes:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al sincronizar clientes.' });
   } finally {
@@ -431,7 +433,12 @@ export const crearPedido = async (req, res) => {
     return res.status(400).json({ ok: false, message: 'Campos obligatorios incompletos.' });
   }
 
-  const detalleArr = typeof detalle === 'string' ? JSON.parse(detalle) : detalle;
+  let detalleArr;
+  try {
+    detalleArr = typeof detalle === 'string' ? JSON.parse(detalle) : detalle;
+  } catch {
+    return res.status(400).json({ ok: false, message: 'El formato del detalle del pedido no es válido.' });
+  }
   if (!Array.isArray(detalleArr) || detalleArr.length === 0) {
     return res.status(400).json({ ok: false, message: 'El pedido debe tener al menos un producto.' });
   }
@@ -470,7 +477,7 @@ export const crearPedido = async (req, res) => {
     // Insertar detalle del pedido
     for (const item of detalleArr) {
       if (!item.producto_id || !item.cantidad || !item.precio) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(400).json({ ok: false, message: 'Cada producto debe tener producto_id, cantidad y precio.' });
       }
       const subtotal = parseFloat(item.cantidad) * parseFloat(item.precio);
@@ -482,8 +489,8 @@ export const crearPedido = async (req, res) => {
 
     // Si viene del Dashboard �  crear venta automáticamente
     if (esDashboard) {
-      const { VENTAS_QUERIES } = await import('../queries/ventas.queries.js');
-      const { PRODUCTOS_QUERIES } = await import('../queries/productos.queries.js');
+      // import VENTAS_QUERIES arriba
+      // import PRODUCTOS_QUERIES arriba
 
       // Número de venta
       const { rows: numVtaRows } = await client.query(VENTAS_QUERIES.NEXT_NUMERO);
@@ -541,7 +548,7 @@ export const crearPedido = async (req, res) => {
     });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al crear pedido:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al registrar el pedido.' });
   } finally {
@@ -559,7 +566,12 @@ export const editarPedido = async (req, res) => {
     return res.status(400).json({ ok: false, message: 'Campos obligatorios incompletos.' });
   }
 
-  const detalleArr = typeof detalle === 'string' ? JSON.parse(detalle) : detalle;
+  let detalleArr;
+  try {
+    detalleArr = typeof detalle === 'string' ? JSON.parse(detalle) : detalle;
+  } catch {
+    return res.status(400).json({ ok: false, message: 'El formato del detalle del pedido no es válido.' });
+  }
 
   const client = await pool.connect();
   try {
@@ -573,7 +585,7 @@ export const editarPedido = async (req, res) => {
     ]);
 
     if (rows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(400).json({ ok: false, message: 'Pedido no encontrado o no editable en su estado actual.' });
     }
 
@@ -610,7 +622,7 @@ export const editarPedido = async (req, res) => {
     return res.status(200).json({ ok: true, message: 'Pedido actualizado correctamente.', data: completo[0] });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al editar pedido:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al actualizar el pedido.' });
   } finally {
@@ -648,7 +660,7 @@ export const cambiarEstadoPedido = async (req, res) => {
 
     const { rows } = await client.query(PEDIDOS_QUERIES.CAMBIAR_ESTADO, [estado.toUpperCase(), id]);
     if (rows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(404).json({ ok: false, message: 'Pedido no encontrado.' });
     }
 
@@ -666,7 +678,7 @@ export const cambiarEstadoPedido = async (req, res) => {
     await client.query('COMMIT');
     return res.status(200).json({ ok: true, message: 'Estado del pedido actualizado.', data: rows[0] });
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al cambiar estado:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al cambiar el estado del pedido.' });
   } finally {

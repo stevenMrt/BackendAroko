@@ -34,10 +34,26 @@ export const COMPRAS_QUERIES = {
       c.iva,
       c.iva_valor,
       c.subtotal_base,
-      c.total_compra
+      c.total_compra,
+      COALESCE(
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'insumo_id',     dc.insumo_id,
+            'nombre_insumo', i.nombre,
+            'unidad_medida', i.unidad_medida,
+            'cantidad',      dc.cantidad,
+            'precio',        dc.precio_unitario,
+            'subtotal',      dc.subtotal
+          ) ORDER BY dc.id_detalle
+        ) FILTER (WHERE dc.id_detalle IS NOT NULL),
+        '[]'
+      ) AS detalle
     FROM compras c
-    JOIN proveedores p ON p.id_proveedor = c.proveedor_id
-    JOIN empleados   e ON e.id_empleado  = c.empleado_id
+    JOIN proveedores   p  ON p.id_proveedor = c.proveedor_id
+    JOIN empleados     e  ON e.id_empleado  = c.empleado_id
+    LEFT JOIN detalle_compra dc ON dc.compra_id = c.id_compra
+    LEFT JOIN insumos        i  ON i.id_insumo  = dc.insumo_id
+    GROUP BY c.id_compra, p.nombre, e.nombre
     ORDER BY c.fecha_compra DESC, c.id_compra DESC
   `,
 
@@ -55,12 +71,28 @@ export const COMPRAS_QUERIES = {
       c.iva,
       c.iva_valor,
       c.subtotal_base,
-      c.total_compra
+      c.total_compra,
+      COALESCE(
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'insumo_id',     dc.insumo_id,
+            'nombre_insumo', i.nombre,
+            'unidad_medida', i.unidad_medida,
+            'cantidad',      dc.cantidad,
+            'precio',        dc.precio_unitario,
+            'subtotal',      dc.subtotal
+          ) ORDER BY dc.id_detalle
+        ) FILTER (WHERE dc.id_detalle IS NOT NULL),
+        '[]'
+      ) AS detalle
     FROM compras c
-    JOIN proveedores p ON p.id_proveedor = c.proveedor_id
-    JOIN empleados   e ON e.id_empleado  = c.empleado_id
+    JOIN proveedores   p  ON p.id_proveedor = c.proveedor_id
+    JOIN empleados     e  ON e.id_empleado  = c.empleado_id
+    LEFT JOIN detalle_compra dc ON dc.compra_id = c.id_compra
+    LEFT JOIN insumos        i  ON i.id_insumo  = dc.insumo_id
     WHERE c.numero_factura ILIKE $1
        OR p.nombre         ILIKE $1
+    GROUP BY c.id_compra, p.nombre, e.nombre
     ORDER BY c.fecha_compra DESC
   `,
 
@@ -79,13 +111,30 @@ export const COMPRAS_QUERIES = {
       c.iva,
       c.iva_valor,
       c.subtotal_base,
-      c.total_compra
+      c.total_compra,
+      COALESCE(
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'insumo_id',     dc.insumo_id,
+            'nombre_insumo', i.nombre,
+            'unidad_medida', i.unidad_medida,
+            'cantidad',      dc.cantidad,
+            'precio',        dc.precio_unitario,
+            'subtotal',      dc.subtotal
+          ) ORDER BY dc.id_detalle
+        ) FILTER (WHERE dc.id_detalle IS NOT NULL),
+        '[]'
+      ) AS detalle
     FROM compras c
-    JOIN proveedores p ON p.id_proveedor = c.proveedor_id
-    JOIN empleados   e ON e.id_empleado  = c.empleado_id
+    JOIN proveedores   p  ON p.id_proveedor = c.proveedor_id
+    JOIN empleados     e  ON e.id_empleado  = c.empleado_id
+    LEFT JOIN detalle_compra dc ON dc.compra_id = c.id_compra
+    LEFT JOIN insumos        i  ON i.id_insumo  = dc.insumo_id
     WHERE c.fecha_compra BETWEEN $1 AND $2
+    GROUP BY c.id_compra, p.nombre, e.nombre
     ORDER BY c.fecha_compra DESC
   `,
+
 
   // Detalle de una compra con su detalle de insumos
   FIND_BY_ID: `

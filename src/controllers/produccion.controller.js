@@ -63,7 +63,12 @@ export const registrarProduccion = async (req, res) => {
     return res.status(400).json({ ok: false, message: 'Campos obligatorios incompletos.' });
   }
 
-  const detalleArr = typeof detalle === 'string' ? JSON.parse(detalle) : detalle;
+  let detalleArr;
+  try {
+    detalleArr = typeof detalle === 'string' ? JSON.parse(detalle) : detalle;
+  } catch {
+    return res.status(400).json({ ok: false, message: 'El formato del detalle no es válido.' });
+  }
 
   if (!Array.isArray(detalleArr) || detalleArr.length === 0) {
     return res.status(400).json({ ok: false, message: 'Debes agregar al menos un producto al detalle.' });
@@ -86,14 +91,14 @@ export const registrarProduccion = async (req, res) => {
     for (const item of detalleArr) {
       const cantidad = parseFloat(item.cantidad);
       if (!cantidad || cantidad <= 0) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(400).json({ ok: false, message: `La cantidad para el producto ${item.producto_id} debe ser mayor a cero.` });
       }
 
       // Traer la receta del producto
       const { rows: receta } = await client.query(PRODUCCION_QUERIES.GET_RECETA, [item.producto_id]);
       if (receta.length === 0) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(400).json({ ok: false, message: `El producto ${item.producto_id} no tiene receta definida.` });
       }
 
@@ -111,7 +116,7 @@ export const registrarProduccion = async (req, res) => {
       if (insumo.length === 0) continue;
 
       if (parseFloat(insumo[0].stock_actual) < totalRequerido) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(400).json({
           ok: false,
           message: `Stock insuficiente para "${insumo[0].nombre}". Disponible: ${insumo[0].stock_actual} ${insumo[0].unidad_medida}, Requerido: ${totalRequerido.toFixed(2)} ${insumo[0].unidad_medida}.`,
@@ -169,7 +174,7 @@ export const registrarProduccion = async (req, res) => {
     });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al registrar producción:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al registrar la producción.' });
   } finally {
@@ -195,7 +200,7 @@ export const anularProduccion = async (req, res) => {
     // Anular cabecera
     const { rows } = await client.query(PRODUCCION_QUERIES.ANULAR, [motivo_anulacion.trim(), id]);
     if (rows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(400).json({ ok: false, message: 'La producción no existe o ya está anulada.' });
     }
 
@@ -227,7 +232,7 @@ export const anularProduccion = async (req, res) => {
     });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al anular producción:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al anular la producción.' });
   } finally {
@@ -283,7 +288,12 @@ export const crearSalida = async (req, res) => {
     return res.status(400).json({ ok: false, message: 'Campos obligatorios incompletos.' });
   }
 
-  const detalleArr = typeof detalle === 'string' ? JSON.parse(detalle) : detalle;
+  let detalleArr;
+  try {
+    detalleArr = typeof detalle === 'string' ? JSON.parse(detalle) : detalle;
+  } catch {
+    return res.status(400).json({ ok: false, message: 'El formato del detalle no es válido.' });
+  }
   if (!Array.isArray(detalleArr) || detalleArr.length === 0) {
     return res.status(400).json({ ok: false, message: 'La salida debe tener al menos un insumo.' });
   }
@@ -298,11 +308,11 @@ export const crearSalida = async (req, res) => {
         'SELECT nombre, stock_actual, unidad_medida FROM insumos WHERE id_insumo = $1', [item.insumo_id]
       );
       if (ins.length === 0) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(400).json({ ok: false, message: `Insumo ${item.insumo_id} no encontrado.` });
       }
       if (parseFloat(ins[0].stock_actual) < parseFloat(item.cantidad)) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(400).json({
           ok: false,
           message: `Stock insuficiente para "${ins[0].nombre}". Disponible: ${ins[0].stock_actual} ${ins[0].unidad_medida}.`,
@@ -330,7 +340,7 @@ export const crearSalida = async (req, res) => {
     });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al crear salida:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al registrar la salida.' });
   } finally {
@@ -348,7 +358,7 @@ export const anularSalida = async (req, res) => {
     // Anular
     const { rows } = await client.query(SALIDAS_QUERIES.ANULAR, [id]);
     if (rows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(400).json({ ok: false, message: 'La salida no existe o ya está anulada.' });
     }
 
@@ -366,7 +376,7 @@ export const anularSalida = async (req, res) => {
     });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error al anular salida:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al anular la salida.' });
   } finally {

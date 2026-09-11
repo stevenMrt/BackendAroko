@@ -19,6 +19,13 @@ export function buildImageUrl(imagen) {
   const base = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
   const rutas = imagen.split('|').map((r) => r.trim()).filter(Boolean);
   const urls = rutas.map((r) => {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(r)) {
+      if (!base.includes('localhost') && !base.includes('127.0.0.1')) {
+        const pathPart = r.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, '');
+        return `${base}${pathPart.startsWith('/') ? pathPart : `/${pathPart}`}`;
+      }
+      return r;
+    }
     if (/^https?:\/\//i.test(r)) return r;
     return `${base}${r.startsWith('/') ? r : `/${r}`}`;
   });
@@ -34,6 +41,13 @@ export function buildImageArray(imagen) {
   const base = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
   const rutas = imagen.split('|').map((r) => r.trim()).filter(Boolean);
   return rutas.map((r) => {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(r)) {
+      if (!base.includes('localhost') && !base.includes('127.0.0.1')) {
+        const pathPart = r.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, '');
+        return `${base}${pathPart.startsWith('/') ? pathPart : `/${pathPart}`}`;
+      }
+      return r;
+    }
     if (/^https?:\/\//i.test(r)) return r;
     return `${base}${r.startsWith('/') ? r : `/${r}`}`;
   });

@@ -408,23 +408,35 @@ export const me = async (req, res) => {
   }
 };
 
-// PUT /api/auth/user/:id
-// Body: { nombre_usuario, correo, contrasena? }
+// PUT /api/auth/me o PUT /api/auth/user/:id
+// Body: { nombre_usuario, correo?, email?, telefono?, direccion?, contrasena? }
 export const actualizarPerfil = async (req, res) => {
-  const id_usuario = parseInt(req.params.id, 10);
+  const id_usuario = req.params.id ? parseInt(req.params.id, 10) : req.usuario?.id_usuario;
+
+  if (!id_usuario || isNaN(id_usuario)) {
+    return res.status(400).json({ ok: false, message: 'ID de usuario inválido.' });
+  }
 
   // Solo el propio usuario puede editarse
   if (req.usuario.id_usuario !== id_usuario) {
     return res.status(403).json({ ok: false, message: 'No puedes modificar otro usuario.' });
   }
 
-  const { nombre_usuario, correo, contrasena } = req.body;
+  const nombre_usuario = (req.body.nombre_usuario || req.body.nombre || '').trim();
+  const correo = (req.body.correo || req.body.email || req.usuario.correo || '').trim().toLowerCase();
+  const telefono = req.body.telefono !== undefined ? String(req.body.telefono).trim() : null;
+  const direccion = req.body.direccion !== undefined ? String(req.body.direccion).trim() : null;
+  const contrasena = req.body.contrasena;
 
-  if (!nombre_usuario || !correo) {
-    return res.status(400).json({ ok: false, message: 'Nombre y correo son obligatorios.' });
+  if (!nombre_usuario) {
+    return res.status(400).json({ ok: false, message: 'El nombre es obligatorio.' });
   }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim())) {
+  if (!correo) {
+    return res.status(400).json({ ok: false, message: 'El correo es obligatorio.' });
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
     return res.status(400).json({ ok: false, message: 'El correo no tiene un formato válido.' });
   }
 
@@ -437,46 +449,72 @@ export const actualizarPerfil = async (req, res) => {
       AUTH_QUERIES.FIND_BY_ID, [id_usuario]
     );
     if (existe.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(404).json({ ok: false, message: 'Cuenta no encontrada.' });
     }
 
     // Verificar correo duplicado en otro usuario
     const { rows: dupCorreo } = await client.query(
       `SELECT id_usuario FROM usuarios WHERE LOWER(correo) = LOWER($1) AND id_usuario != $2`,
-      [correo.trim(), id_usuario]
+      [correo, id_usuario]
     );
     if (dupCorreo.length > 0) {
-      await client.query('ROLLBACK');
+      await client.query('ROLLBACK').catch(() => {});
       return res.status(409).json({ ok: false, message: 'Ese correo ya está en uso.' });
     }
 
     let updatedRows;
     if (contrasena) {
       if (contrasena.length < 8 || !/[A-Z]/.test(contrasena) || !/[0-9]/.test(contrasena)) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         return res.status(400).json({ ok: false, message: 'La contraseña debe tener al menos 8 caracteres, una mayúscula y un número.' });
       }
       const hash = await bcrypt.hash(contrasena, 10);
       ({ rows: updatedRows } = await client.query(
         AUTH_QUERIES.UPDATE_PERFIL_CON_PASSWORD,
-        [nombre_usuario.trim(), correo.trim().toLowerCase(), hash, id_usuario]
+        [nombre_usuario, correo, hash, id_usuario]
       ));
     } else {
       ({ rows: updatedRows } = await client.query(
         AUTH_QUERIES.UPDATE_PERFIL,
-        [nombre_usuario.trim(), correo.trim().toLowerCase(), id_usuario]
+        [nombre_usuario, correo, id_usuario]
       ));
     }
 
+    // Sincronizar telefono en usuarios si se proporcionó
+    if (telefono !== null) {
+      await client.query(
+        `UPDATE usuarios SET telefono = $1 WHERE id_usuario = $2`,
+        [telefono, id_usuario]
+      ).catch(() => {});
+    }
+
+    // Sincronizar en tabla clientes si el usuario está asociado a un registro de cliente
+    await client.query(
+      `UPDATE clientes
+       SET nombre = $1,
+           email = $2,
+           telefono = COALESCE($3, telefono),
+           direccion = COALESCE($4, direccion)
+       WHERE usuario_id = $5`,
+      [nombre_usuario, correo, telefono, direccion, id_usuario]
+    ).catch(() => {});
+
     await client.query('COMMIT');
+
+    const usuarioFinal = {
+      ...updatedRows[0],
+      telefono: telefono ?? updatedRows[0].telefono ?? null,
+      direccion: direccion ?? null,
+    };
+
     return res.status(200).json({
       ok: true,
       message: 'Perfil actualizado correctamente.',
-      usuario: formatearUsuario(updatedRows[0]),
+      usuario: formatearUsuario(usuarioFinal),
     });
   } catch (error) {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK').catch(() => {});
     logger.error('Error en actualizarPerfil:', error.message, '| code:', error.code);
     if (error.code === '23505') {
       return res.status(409).json({ ok: false, message: 'El correo ya está registrado.' });

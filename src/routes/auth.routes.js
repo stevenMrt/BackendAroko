@@ -33,6 +33,7 @@ router.post('/reset-password', authLimiter, resetPassword);
 
 // ── Rutas protegidas ────────────────────────
 router.get('/me',         verificarToken, me);
+router.put('/me',         verificarToken, actualizarPerfil);
 router.put('/user/:id',   verificarToken, actualizarPerfil);
 
 export default router;
