@@ -64,7 +64,7 @@ export const USUARIOS_QUERIES = {
   `,
 
   CORREO_EXISTS: `
-    SELECT id_usuario FROM usuarios
+    SELECT id_usuario, estado FROM usuarios
     WHERE LOWER(correo) = LOWER($1) AND id_usuario != $2
   `,
 

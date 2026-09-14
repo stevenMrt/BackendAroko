@@ -463,158 +463,67 @@ export const editarDomicilio = async(req,res)=>{
 // CAMBIAR ESTADO
 // ==========================================
 export const cambiarEstadoDomicilio = async(req,res)=>{
-
-
   try{
-
-
     const {id}=req.params;
-
-
     const {estado}=req.body;
+    const estadoNorm = (estado || '').toString().trim().toUpperCase();
 
-
-
-
-    if(!ESTADOS_VALIDOS.includes(estado)){
-
-
+    if(!ESTADOS_VALIDOS.includes(estadoNorm)){
       return res.status(400).json({
-
         ok:false,
-
-        message:"Estado inválido."
-
+        message:"Estado inválido. Debe ser PENDIENTE, EN_CAMINO, ENTREGADO o CANCELADO."
       });
-
     }
-
-
-
-
 
     const actual = await pool.query(
-
       DOMICILIOS_QUERIES.FIND_BY_ID,
-
       [id]
-
     );
-
-
 
     if(!actual.rows.length){
-
-
       return res.status(404).json({
-
         ok:false,
-
         message:"Domicilio no encontrado."
-
       });
-
     }
-
-
-
-
-    const estadoActual = actual.rows[0].estado;
-
-
-
-
-    if(!TRANSICIONES_ESTADO[estadoActual].includes(estado)){
-
-
-      return res.status(400).json({
-
-        ok:false,
-
-        message:
-        `No se puede cambiar de ${estadoActual} a ${estado}.`
-
-      });
-
-    }
-
-
-
-
-
 
     const result = await pool.query(
-
       DOMICILIOS_QUERIES.CAMBIAR_ESTADO,
-
       [
-
-        estado,
-
+        estadoNorm,
         id
-
       ]
-
     );
 
-
-
-
-
-
-
-    // Preparación para correo cuando se entrega
-
-    if(estado === "ENTREGADO"){
-      const datosCorreo = await pool.query(DOMICILIOS_QUERIES.OBTENER_CORREO, [id]);
-      const cliente = datosCorreo.rows[0];
-      if(cliente?.email){
-        await enviarCorreoEntrega({
-          correo: cliente.email,
-          nombre: cliente.nombre,
-        });
-        logger.info("Correo de entrega enviado a:", cliente.email);
+    // Preparación para correo cuando se entrega (sin bloquear si falla correo)
+    if(estadoNorm === "ENTREGADO"){
+      try {
+        const datosCorreo = await pool.query(DOMICILIOS_QUERIES.OBTENER_CORREO, [id]);
+        const cliente = datosCorreo.rows[0];
+        if(cliente?.email){
+          await enviarCorreoEntrega({
+            correo: cliente.email,
+            nombre: cliente.nombre,
+          });
+          logger.info("Correo de entrega enviado a:", cliente.email);
+        }
+      } catch (mailErr) {
+        logger.warn("No se pudo enviar correo de entrega:", mailErr.message);
       }
     }
 
-
-
-
     res.json({
-
       ok:true,
-
-      message:"Estado actualizado.",
-
+      message:"Estado actualizado correctamente.",
       data:result.rows[0]
-
     });
-
-
-
-
-
   }catch(error){
-
-
-    logger.error(
-      "Error cambiar estado:",
-      error
-    );
-
-
-
+    logger.error("Error cambiar estado domicilio:", error);
     res.status(500).json({
-
       ok:false,
-
-      message:"Error al cambiar estado."
-
+      message:"Error al cambiar estado del domicilio."
     });
-
-
   }
-
 };
 
 // ==========================================

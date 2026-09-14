@@ -75,20 +75,6 @@ export const crearCliente = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const { rows: dupDoc } = await client.query(CLIENTES_QUERIES.DOCUMENTO_EXISTS, [numDoc, 0]);
-    if (dupDoc.length > 0) {
-      await client.query('ROLLBACK').catch(() => {});
-      return res.status(409).json({ ok: false, message: 'El cliente ya se encuentra registrado.' });
-    }
-
-    if (email && email.toString().trim()) {
-      const { rows: dupEmail } = await client.query(CLIENTES_QUERIES.EMAIL_EXISTS, [email.toString().trim(), 0]);
-      if (dupEmail.length > 0) {
-        await client.query('ROLLBACK').catch(() => {});
-        return res.status(409).json({ ok: false, message: 'Ya existe un cliente con ese correo.' });
-      }
-    }
-
     // Validar que usuario_id pertenezca a rol Cliente si fue provisto
     let usuarioIdFinal = usuario_id || null;
     if (usuarioIdFinal) {
@@ -98,10 +84,8 @@ export const crearCliente = async (req, res) => {
         [usuarioIdFinal]
       );
       if (rolCheck.length === 0) {
-        // Si no tiene rol Cliente (ej: empleado/admin en sesión), se ignora para no bloquear la creación
         usuarioIdFinal = null;
       } else {
-        // Verificar que ese usuario no tenga ya un cliente
         const { rows: dupUsr } = await client.query(CLIENTES_QUERIES.FIND_BY_USUARIO_ID, [usuarioIdFinal]);
         if (dupUsr.length > 0) {
           usuarioIdFinal = null;
@@ -117,6 +101,28 @@ export const crearCliente = async (req, res) => {
         [email.toString().trim()]
       );
       if (uRows.length > 0) usuarioIdFinal = uRows[0].id_usuario;
+    }
+
+    const { rows: dupDoc } = await client.query(CLIENTES_QUERIES.DOCUMENTO_EXISTS, [numDoc, 0]);
+    if (dupDoc.length > 0) {
+      if (dupDoc[0].estado === 'INACTIVO') {
+        const { rows: reactivados } = await client.query(
+          `UPDATE clientes SET nombre = $1, tipo_documento = $2, documento = $3, telefono = $4, email = $5, direccion = $6, usuario_id = $7, estado = 'ACTIVO' WHERE id_cliente = $8 RETURNING *`,
+          [nombre.trim(), tipo_documento, numDoc, (telefono || '').toString().trim(), (email || '').toString().trim().toLowerCase() || null, (direccion || '').toString().trim(), usuarioIdFinal, dupDoc[0].id_cliente]
+        );
+        await client.query('COMMIT');
+        return res.status(200).json({ ok: true, message: 'Cliente reactivado exitosamente.', data: reactivados[0] });
+      }
+      await client.query('ROLLBACK').catch(() => {});
+      return res.status(409).json({ ok: false, message: 'El cliente ya se encuentra registrado.' });
+    }
+
+    if (email && email.toString().trim()) {
+      const { rows: dupEmail } = await client.query(CLIENTES_QUERIES.EMAIL_EXISTS, [email.toString().trim(), 0]);
+      if (dupEmail.length > 0) {
+        await client.query('ROLLBACK').catch(() => {});
+        return res.status(409).json({ ok: false, message: 'Ya existe un cliente con ese correo.' });
+      }
     }
 
     const { rows } = await client.query(CLIENTES_QUERIES.CREATE, [
@@ -173,7 +179,7 @@ export const editarCliente = async (req, res) => {
     const { rows } = await client.query(CLIENTES_QUERIES.UPDATE, [
       nombre.trim(),
       tipo_documento,
-      numero_documento.trim(),
+      numDoc,
       (telefono  || '').trim(),
       emailFinal,
       (direccion || '').trim(),
@@ -223,16 +229,28 @@ export const cambiarEstadoCliente = async (req, res) => {
   }
 };
 
-// DELETE /api/clientes/:id � soft delete
+// DELETE /api/clientes/:id – hard delete if possible, fallback to soft delete
 export const eliminarCliente = async (req, res) => {
   const { id } = req.params;
   try {
-    const { rows } = await pool.query(CLIENTES_QUERIES.SOFT_DELETE, [id]);
-    if (rows.length === 0) {
-      return res.status(404).json({ ok: false, message: 'Cliente no encontrado.' });
+    try {
+      const { rowCount } = await pool.query('DELETE FROM clientes WHERE id_cliente = $1', [id]);
+      if (rowCount === 0) {
+        return res.status(404).json({ ok: false, message: 'Cliente no encontrado.' });
+      }
+      return res.status(200).json({ ok: true, message: 'Cliente eliminado correctamente.' });
+    } catch (fkErr) {
+      if (fkErr.code === '23503') {
+        const { rows } = await pool.query(CLIENTES_QUERIES.SOFT_DELETE, [id]);
+        if (rows.length === 0) {
+          return res.status(404).json({ ok: false, message: 'Cliente no encontrado.' });
+        }
+        return res.status(200).json({ ok: true, message: 'Cliente inactivado por tener pedidos vinculados.', data: rows[0] });
+      }
+      throw fkErr;
     }
-    return res.status(200).json({ ok: true, message: 'Cliente eliminado correctamente.', data: rows[0] });
   } catch (error) {
+    logger.error('Error al eliminar cliente:', error.message);
     return res.status(500).json({ ok: false, message: 'Error al eliminar el cliente.' });
   }
 };

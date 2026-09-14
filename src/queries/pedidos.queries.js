@@ -201,12 +201,12 @@ export const CLIENTES_QUERIES = {
   `,
 
   DOCUMENTO_EXISTS: `
-    SELECT id_cliente FROM clientes
+    SELECT id_cliente, estado FROM clientes
     WHERE documento = $1 AND id_cliente != $2
   `,
 
   EMAIL_EXISTS: `
-    SELECT id_cliente FROM clientes
+    SELECT id_cliente, estado FROM clientes
     WHERE LOWER(email) = LOWER($1) AND id_cliente != $2 AND email IS NOT NULL
   `,
 };

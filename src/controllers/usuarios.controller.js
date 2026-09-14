@@ -67,6 +67,20 @@ export const crearUsuario = async (req, res) => {
     await client.query('BEGIN');
     const { rows: dup } = await client.query(USUARIOS_QUERIES.CORREO_EXISTS, [correo.trim(), 0]);
     if (dup.length > 0) {
+      if (dup[0].estado === 'INACTIVO') {
+        const hash = await bcrypt.hash(contrasena, 10);
+        const { rows: reactivados } = await client.query(USUARIOS_QUERIES.UPDATE_WITH_PASSWORD, [
+          correo.trim().toLowerCase(),
+          rol_id,
+          (nombre_usuario || '').trim() || null,
+          (telefono || '').trim() || null,
+          'ACTIVO',
+          hash,
+          dup[0].id_usuario,
+        ]);
+        await client.query('COMMIT');
+        return res.status(200).json({ ok: true, message: 'Usuario reactivado exitosamente.', data: reactivados[0] });
+      }
       await client.query('ROLLBACK');
       return res.status(409).json({ ok: false, message: 'El usuario ya se encuentra registrado.' });
     }
@@ -209,15 +223,26 @@ export const cambiarEstadoUsuario = async (req, res) => {
   }
 };
 
-// DELETE /api/usuarios/:id  �  soft delete (inactiva)
+// DELETE /api/usuarios/:id  – hard delete if possible, fallback to soft delete
 export const eliminarUsuario = async (req, res) => {
   const { id } = req.params;
   try {
-    const { rows } = await pool.query(USUARIOS_QUERIES.SOFT_DELETE, [id]);
-    if (rows.length === 0) {
-      return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    try {
+      const { rowCount } = await pool.query('DELETE FROM usuarios WHERE id_usuario = $1', [id]);
+      if (rowCount === 0) {
+        return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+      }
+      return res.status(200).json({ ok: true, message: 'Usuario eliminado correctamente.' });
+    } catch (fkErr) {
+      if (fkErr.code === '23503') {
+        const { rows } = await pool.query(USUARIOS_QUERIES.SOFT_DELETE, [id]);
+        if (rows.length === 0) {
+          return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+        }
+        return res.status(200).json({ ok: true, message: 'Usuario desactivado por tener registros asociados.', data: rows[0] });
+      }
+      throw fkErr;
     }
-    return res.status(200).json({ ok: true, message: 'Usuario eliminado correctamente.', data: rows[0] });
   } catch (error) {
     logger.error('Error al eliminar usuario:', error.message);
     return res.status(500).json({ ok: false, message: 'Usuario no pudo ser eliminado.' });
