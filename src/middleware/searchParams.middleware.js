@@ -2,7 +2,7 @@
 
 const VALID_ORDER = ['recientes', 'precio_asc', 'precio_desc', 'mas_vendidos'];
 const DEFAULT_LIMIT = 8;
-const MAX_LIMIT     = 50;
+const MAX_LIMIT     = 100;
 
 /**
  * Valida y normaliza los query params del endpoint de búsqueda.

@@ -139,7 +139,6 @@ export const EMPLEADOS_QUERIES = {
       e.estado
     FROM empleados e
     LEFT JOIN usuarios u ON u.id_usuario = e.usuario_id
-    WHERE e.estado = 'ACTIVO'
     ORDER BY e.id_empleado
   `,
 
@@ -161,8 +160,7 @@ export const EMPLEADOS_QUERIES = {
       e.estado
     FROM empleados e
     LEFT JOIN usuarios u ON u.id_usuario = e.usuario_id
-    WHERE e.estado = 'ACTIVO'
-      AND (e.nombre ILIKE $1 OR e.documento ILIKE $1 OR u.correo ILIKE $1 OR e.cargo ILIKE $1)
+    WHERE (e.nombre ILIKE $1 OR e.documento ILIKE $1 OR u.correo ILIKE $1 OR e.cargo ILIKE $1)
     ORDER BY e.id_empleado
   `,
 

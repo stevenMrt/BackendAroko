@@ -5,7 +5,6 @@
 // ══════════════════════════════════════════════
 export const PROVEEDORES_QUERIES = {
 
-  // Solo ACTIVOS (soft delete)
   LIST: `
     SELECT
       p.id_proveedor,
@@ -20,7 +19,6 @@ export const PROVEEDORES_QUERIES = {
     FROM proveedores p
     LEFT JOIN empleados e ON e.id_empleado = p.empleado_id
     LEFT JOIN compras   c ON c.proveedor_id = p.id_proveedor
-    WHERE p.estado = 'ACTIVO'
     GROUP BY p.id_proveedor, e.nombre
     ORDER BY p.id_proveedor
   `,
@@ -39,8 +37,7 @@ export const PROVEEDORES_QUERIES = {
     FROM proveedores p
     LEFT JOIN empleados e ON e.id_empleado = p.empleado_id
     LEFT JOIN compras   c ON c.proveedor_id = p.id_proveedor
-    WHERE p.estado = 'ACTIVO'
-      AND (p.nombre ILIKE $1 OR p.email ILIKE $1 OR p.telefono ILIKE $1)
+    WHERE (p.nombre ILIKE $1 OR p.email ILIKE $1 OR p.telefono ILIKE $1)
     GROUP BY p.id_proveedor, e.nombre
     ORDER BY p.id_proveedor
   `,
@@ -115,7 +112,6 @@ export const CAT_INSUMO_QUERIES = {
       COUNT(i.id_insumo) AS total_insumos
     FROM categorias_insumo ci
     LEFT JOIN insumos i ON i.categoria_id = ci.id_categoria AND i.estado = 'ACTIVO'
-    WHERE ci.estado = 'ACTIVO'
     GROUP BY ci.id_categoria
     ORDER BY ci.id_categoria
   `,
@@ -181,7 +177,7 @@ export const CAT_INSUMO_QUERIES = {
 // ══════════════════════════════════════════════
 export const INSUMOS_QUERIES = {
 
-  // Solo ACTIVOS — alias nombre AS nombre_insumo para que coincida con el frontend
+  // Alias nombre AS nombre_insumo para que coincida con el frontend
   LIST: `
     SELECT
       i.id_insumo,
@@ -198,7 +194,6 @@ export const INSUMOS_QUERIES = {
     FROM insumos i
     LEFT JOIN categorias_insumo ci ON ci.id_categoria = i.categoria_id
     LEFT JOIN detalle_compra    dc ON dc.insumo_id    = i.id_insumo
-    WHERE i.estado = 'ACTIVO'
     GROUP BY i.id_insumo, ci.nombre
     ORDER BY i.id_insumo
   `,
@@ -219,8 +214,7 @@ export const INSUMOS_QUERIES = {
     FROM insumos i
     LEFT JOIN categorias_insumo ci ON ci.id_categoria = i.categoria_id
     LEFT JOIN detalle_compra    dc ON dc.insumo_id    = i.id_insumo
-    WHERE i.estado = 'ACTIVO'
-      AND (i.nombre ILIKE $1 OR ci.nombre ILIKE $1 OR i.unidad_medida ILIKE $1)
+    WHERE (i.nombre ILIKE $1 OR ci.nombre ILIKE $1 OR i.unidad_medida ILIKE $1)
     GROUP BY i.id_insumo, ci.nombre
     ORDER BY i.id_insumo
   `,

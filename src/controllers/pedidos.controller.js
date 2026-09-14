@@ -7,6 +7,7 @@ import logger from '../utils/logger.js';
 import { CLIENTES_QUERIES, PEDIDOS_QUERIES } from '../queries/pedidos.queries.js';
 import { ORDERS_QUERIES } from '../queries/orders.queries.js';
 import { enviarCorreoFechaEntrega } from '../services/email.service.js';
+import { resolverEmpleadoId } from '../utils/empleadoResolver.js';
 
 // Estados válidos del frontend mapeados a la BD
 const ESTADOS_VALIDOS = [
@@ -459,7 +460,7 @@ export const crearPedido = async (req, res) => {
 
     // Nombre del empleado
     const { rows: empRows } = await client.query(
-      'SELECT nombre FROM empleados WHERE id_empleado = $1', [empleado_id]
+      'SELECT nombre FROM empleados WHERE id_empleado = $1', [await resolverEmpleadoId(client, empleado_id)]
     );
     const createdBy = empRows[0]?.nombre || 'Sistema';
 
@@ -469,7 +470,7 @@ export const crearPedido = async (req, res) => {
          (cliente_id, empleado_id, numero_pedido, fecha_entrega, observaciones, created_by, estado, total)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [cliente_id, empleado_id, numeroPedido, fecha_entrega || null,
+      [cliente_id, await resolverEmpleadoId(client, empleado_id), numeroPedido, fecha_entrega || null,
        observaciones.trim(), createdBy, estadoInicial, total]
     );
     const pedidoId = rows[0].id_pedido;

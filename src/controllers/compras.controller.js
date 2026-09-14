@@ -8,6 +8,7 @@ import {
   restarStockConAuditoria,
 } from '../services/inventario.service.js';
 import { buildImageUrl } from '../services/productos.service.js';
+import { resolverEmpleadoId } from '../utils/empleadoResolver.js';
 
 //                                              
 // Utilidad interna
@@ -136,7 +137,7 @@ export const crearCompra = async (req, res) => {
     // Crear cabecera de compra
     const { rows: compraRows } = await client.query(COMPRAS_QUERIES.CREATE, [
       proveedor_id,
-      empleado_id,
+      await resolverEmpleadoId(client, empleado_id),
       numero_factura.trim(),
       foto,
       parseFloat(iva),

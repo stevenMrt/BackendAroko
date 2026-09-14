@@ -5,6 +5,7 @@ import { PRODUCCION_QUERIES, SALIDAS_QUERIES } from '../queries/produccion.queri
 import { INSUMOS_QUERIES }  from '../queries/stock.queries.js';
 import { PRODUCTOS_QUERIES } from '../queries/productos.queries.js';
 import logger from '../utils/logger.js';
+import { resolverEmpleadoId } from '../utils/empleadoResolver.js';
 
 // �"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"��"�
 //  PRODUCCI�N
@@ -126,7 +127,7 @@ export const registrarProduccion = async (req, res) => {
 
     // ���� Paso 3: Crear cabecera ��������������������������������������������������������������������������������������
     const { rows: produccionRows } = await client.query(PRODUCCION_QUERIES.CREATE, [
-      empleado_id,
+      await resolverEmpleadoId(client, empleado_id),
       fecha || new Date(),
       observaciones.trim(),
     ]);
@@ -321,7 +322,7 @@ export const crearSalida = async (req, res) => {
     }
 
     // Crear cabecera
-    const { rows } = await client.query(SALIDAS_QUERIES.CREATE, [empleado_id, motivo.trim()]);
+    const { rows } = await client.query(SALIDAS_QUERIES.CREATE, [await resolverEmpleadoId(client, empleado_id), motivo.trim()]);
     const salidaId = rows[0].id_salida;
 
     // Insertar detalle y descontar stock

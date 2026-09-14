@@ -15,7 +15,6 @@ export const CAT_PRODUCTO_QUERIES = {
     LEFT JOIN productos p
       ON p.categoria_id = cp.id_categoria
       AND p.estado = 'ACTIVO'
-    WHERE cp.estado = 'ACTIVO'
     GROUP BY cp.id_categoria
     ORDER BY cp.id_categoria
   `,
@@ -142,8 +141,6 @@ export const PRODUCTOS_QUERIES = {
     LEFT JOIN insumos i
       ON i.id_insumo = dp.insumo_id
 
-    WHERE p.estado = 'ACTIVO'
-
     GROUP BY
       p.id_producto,
       cp.nombre
@@ -193,8 +190,7 @@ export const PRODUCTOS_QUERIES = {
     LEFT JOIN insumos i
       ON i.id_insumo = dp.insumo_id
 
-    WHERE p.estado = 'ACTIVO'
-      AND (
+    WHERE (
         p.nombre ILIKE $1
         OR cp.nombre ILIKE $1
       )

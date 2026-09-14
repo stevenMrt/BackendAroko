@@ -75,7 +75,7 @@ export const CLIENTES_QUERIES = {
       AND c.usuario_id IS NULL
   `,
 
-  // SOLO clientes con usuario activo de rol Cliente (INNER JOIN estricto)
+  // Clientes para administración (LEFT JOIN para incluir clientes sin usuario web y con estado ACTIVO o INACTIVO)
   LIST: `
     SELECT
       c.id_cliente,
@@ -90,10 +90,9 @@ export const CLIENTES_QUERIES = {
       c.estado,
       COUNT(p.id_pedido) AS pedidos
     FROM clientes c
-    INNER JOIN usuarios u ON u.id_usuario = c.usuario_id
-    INNER JOIN roles   r ON r.id_rol = u.rol_id AND r.nombre = 'Cliente'
+    LEFT  JOIN usuarios u ON u.id_usuario = c.usuario_id
+    LEFT  JOIN roles   r ON r.id_rol = u.rol_id AND r.nombre = 'Cliente'
     LEFT  JOIN pedidos p ON p.cliente_id = c.id_cliente
-    WHERE c.estado = 'ACTIVO'
     GROUP BY c.id_cliente, u.correo
     ORDER BY c.id_cliente
   `,
@@ -112,14 +111,13 @@ export const CLIENTES_QUERIES = {
       c.estado,
       COUNT(p.id_pedido) AS pedidos
     FROM clientes c
-    INNER JOIN usuarios u ON u.id_usuario = c.usuario_id
-    INNER JOIN roles   r ON r.id_rol = u.rol_id AND r.nombre = 'Cliente'
+    LEFT  JOIN usuarios u ON u.id_usuario = c.usuario_id
+    LEFT  JOIN roles   r ON r.id_rol = u.rol_id AND r.nombre = 'Cliente'
     LEFT  JOIN pedidos p ON p.cliente_id = c.id_cliente
-    WHERE c.estado = 'ACTIVO'
-      AND (c.nombre    ILIKE $1
-        OR c.documento ILIKE $1
-        OR c.email     ILIKE $1
-        OR u.correo    ILIKE $1)
+    WHERE c.nombre    ILIKE $1
+       OR c.documento ILIKE $1
+       OR c.email     ILIKE $1
+       OR u.correo    ILIKE $1
     GROUP BY c.id_cliente, u.correo
     ORDER BY c.id_cliente
   `,
@@ -138,8 +136,8 @@ export const CLIENTES_QUERIES = {
       c.estado,
       COUNT(p.id_pedido) AS pedidos
     FROM clientes c
-    INNER JOIN usuarios u ON u.id_usuario = c.usuario_id
-    INNER JOIN roles   r ON r.id_rol = u.rol_id AND r.nombre = 'Cliente'
+    LEFT  JOIN usuarios u ON u.id_usuario = c.usuario_id
+    LEFT  JOIN roles   r ON r.id_rol = u.rol_id AND r.nombre = 'Cliente'
     LEFT  JOIN pedidos p ON p.cliente_id = c.id_cliente
     WHERE c.id_cliente = $1
     GROUP BY c.id_cliente, u.correo

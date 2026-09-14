@@ -5,6 +5,7 @@ import { VENTAS_QUERIES, ABONOS_QUERIES } from '../queries/ventas.queries.js';
 import { PRODUCTOS_QUERIES } from '../queries/productos.queries.js';
 import logger from '../utils/logger.js';
 import { buildImageUrl } from '../services/productos.service.js';
+import { resolverEmpleadoId } from '../utils/empleadoResolver.js';
 
 function normalizarDetalleVenta(detalle) {
   if (!Array.isArray(detalle)) return [];
@@ -121,7 +122,7 @@ export const registrarVenta = async (req, res) => {
       numeroVenta,
       pedido_id || null,
       cliente_id,
-      empleado_id,
+      await resolverEmpleadoId(client, empleado_id),
       fecha_venta || new Date(),
       total,
     ]);
