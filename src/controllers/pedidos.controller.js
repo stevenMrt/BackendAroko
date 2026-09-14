@@ -65,8 +65,9 @@ export const obtenerCliente = async (req, res) => {
 // Body: { nombre, tipo_documento, numero_documento, telefono, email, direccion, usuario_id? }
 export const crearCliente = async (req, res) => {
   const { nombre, tipo_documento = 'CC', numero_documento, telefono, email, direccion, usuario_id } = req.body;
+  const numDoc = (numero_documento || req.body.documento || '').toString().trim();
 
-  if (!nombre || !numero_documento) {
+  if (!nombre || !numDoc) {
     return res.status(400).json({ ok: false, message: 'Campos obligatorios incompletos.' });
   }
 
@@ -74,21 +75,21 @@ export const crearCliente = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const { rows: dupDoc } = await client.query(CLIENTES_QUERIES.DOCUMENTO_EXISTS, [numero_documento.trim(), 0]);
+    const { rows: dupDoc } = await client.query(CLIENTES_QUERIES.DOCUMENTO_EXISTS, [numDoc, 0]);
     if (dupDoc.length > 0) {
       await client.query('ROLLBACK').catch(() => {});
       return res.status(409).json({ ok: false, message: 'El cliente ya se encuentra registrado.' });
     }
 
-    if (email) {
-      const { rows: dupEmail } = await client.query(CLIENTES_QUERIES.EMAIL_EXISTS, [email.trim(), 0]);
+    if (email && email.toString().trim()) {
+      const { rows: dupEmail } = await client.query(CLIENTES_QUERIES.EMAIL_EXISTS, [email.toString().trim(), 0]);
       if (dupEmail.length > 0) {
         await client.query('ROLLBACK').catch(() => {});
         return res.status(409).json({ ok: false, message: 'Ya existe un cliente con ese correo.' });
       }
     }
 
-    // Validar que usuario_id pertenezca a rol Cliente
+    // Validar que usuario_id pertenezca a rol Cliente si fue provisto
     let usuarioIdFinal = usuario_id || null;
     if (usuarioIdFinal) {
       const { rows: rolCheck } = await client.query(
@@ -97,23 +98,23 @@ export const crearCliente = async (req, res) => {
         [usuarioIdFinal]
       );
       if (rolCheck.length === 0) {
-        await client.query('ROLLBACK').catch(() => {});
-        return res.status(400).json({ ok: false, message: 'El usuario indicado no tiene rol Cliente.' });
-      }
-      // Verificar que ese usuario no tenga ya un cliente
-      const { rows: dupUsr } = await client.query(CLIENTES_QUERIES.FIND_BY_USUARIO_ID, [usuarioIdFinal]);
-      if (dupUsr.length > 0) {
-        await client.query('ROLLBACK').catch(() => {});
-        return res.status(409).json({ ok: false, message: 'Ese usuario ya tiene un cliente asociado.' });
+        // Si no tiene rol Cliente (ej: empleado/admin en sesión), se ignora para no bloquear la creación
+        usuarioIdFinal = null;
+      } else {
+        // Verificar que ese usuario no tenga ya un cliente
+        const { rows: dupUsr } = await client.query(CLIENTES_QUERIES.FIND_BY_USUARIO_ID, [usuarioIdFinal]);
+        if (dupUsr.length > 0) {
+          usuarioIdFinal = null;
+        }
       }
     }
 
     // Si hay email y no hay usuario_id, buscar usuario por correo con rol Cliente
-    if (!usuarioIdFinal && email) {
+    if (!usuarioIdFinal && email && email.toString().trim()) {
       const { rows: uRows } = await client.query(
         `SELECT u.id_usuario FROM usuarios u JOIN roles r ON r.id_rol = u.rol_id
          WHERE LOWER(u.correo) = LOWER($1) AND r.nombre = 'Cliente'`,
-        [email.trim()]
+        [email.toString().trim()]
       );
       if (uRows.length > 0) usuarioIdFinal = uRows[0].id_usuario;
     }
@@ -121,10 +122,10 @@ export const crearCliente = async (req, res) => {
     const { rows } = await client.query(CLIENTES_QUERIES.CREATE, [
       nombre.trim(),
       tipo_documento,
-      numero_documento.trim(),
-      (telefono  || '').trim(),
-      (email     || '').trim().toLowerCase() || null,
-      (direccion || '').trim(),
+      numDoc,
+      (telefono  || '').toString().trim(),
+      (email     || '').toString().trim().toLowerCase() || null,
+      (direccion || '').toString().trim(),
       usuarioIdFinal,
     ]);
 
@@ -143,8 +144,9 @@ export const crearCliente = async (req, res) => {
 export const editarCliente = async (req, res) => {
   const { id } = req.params;
   const { nombre, tipo_documento = 'CC', numero_documento, telefono, email, direccion } = req.body;
+  const numDoc = (numero_documento || req.body.documento || '').toString().trim();
 
-  if (!nombre || !numero_documento) {
+  if (!nombre || !numDoc) {
     return res.status(400).json({ ok: false, message: 'Campos obligatorios incompletos.' });
   }
 
@@ -152,7 +154,7 @@ export const editarCliente = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const { rows: dupDoc } = await client.query(CLIENTES_QUERIES.DOCUMENTO_EXISTS, [numero_documento.trim(), id]);
+    const { rows: dupDoc } = await client.query(CLIENTES_QUERIES.DOCUMENTO_EXISTS, [numDoc, id]);
     if (dupDoc.length > 0) {
       await client.query('ROLLBACK').catch(() => {});
       return res.status(409).json({ ok: false, message: 'Ese documento ya pertenece a otro cliente.' });
@@ -330,12 +332,8 @@ export const sincronizarClientes = async (req, res) => {
     // 2. Vincular clientes huérfanos con usuarios por correo coincidente (solo rol Cliente)
     const { rowCount: vinculados } = await client.query(CLIENTES_QUERIES.SYNC_USUARIO_ID);
 
-    // 3. Eliminar clientes que siguen sin usuario_id y no tienen pedidos
-    const { rowCount: eliminados } = await client.query(
-      `DELETE FROM clientes
-       WHERE usuario_id IS NULL
-         AND id_cliente NOT IN (SELECT DISTINCT cliente_id FROM pedidos)`
-    );
+    // 3. Clientes sin usuario_id se conservan (no se eliminan)
+    const eliminados = 0;
 
     // 4. Crear registros de cliente para usuarios con rol Cliente que no tienen cliente
     const { rows: sinCliente } = await client.query(CLIENTES_QUERIES.USUARIOS_CLIENTE_SIN_REGISTRO);
@@ -370,7 +368,7 @@ export const sincronizarClientes = async (req, res) => {
 // GET /api/pedidos?search=&estado=&desde=&hasta=
 // Sin parámetros devuelve solo pedidos ACTIVO (Pendientes) para la sección Pedidos del dashboard
 export const listarPedidos = async (req, res) => {
-  const { search, estado, desde, hasta } = req.query;
+  const { search, estado, desde, hasta, todos } = req.query;
   try {
     let rows;
 
@@ -380,8 +378,10 @@ export const listarPedidos = async (req, res) => {
       ({ rows } = await pool.query(PEDIDOS_QUERIES.FILTER_ESTADO, [estado.toUpperCase()]));
     } else if (search) {
       ({ rows } = await pool.query(PEDIDOS_QUERIES.SEARCH, [`%${search.trim()}%`]));
-    } else {
+    } else if (todos === 'false') {
       ({ rows } = await pool.query(PEDIDOS_QUERIES.LIST_PENDIENTES));
+    } else {
+      ({ rows } = await pool.query(PEDIDOS_QUERIES.LIST));
     }
 
     if (rows.length === 0) {

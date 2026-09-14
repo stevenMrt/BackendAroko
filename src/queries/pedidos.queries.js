@@ -284,8 +284,8 @@ export const PEDIDOS_QUERIES = {
         '[]'
       ) AS detalle
     FROM pedidos p
-    JOIN clientes  c ON c.id_cliente  = p.cliente_id
-    JOIN empleados e ON e.id_empleado = p.empleado_id
+    LEFT JOIN clientes  c ON c.id_cliente  = p.cliente_id
+    LEFT JOIN empleados e ON e.id_empleado = p.empleado_id
     LEFT JOIN orders           o  ON o.pedido_id   = p.id_pedido
     LEFT JOIN detalle_pedido dp ON dp.pedido_id   = p.id_pedido
     LEFT JOIN productos      pr ON pr.id_producto = dp.producto_id
@@ -327,8 +327,8 @@ export const PEDIDOS_QUERIES = {
         '[]'
       ) AS detalle
     FROM pedidos p
-    JOIN clientes  c ON c.id_cliente  = p.cliente_id
-    JOIN empleados e ON e.id_empleado = p.empleado_id
+    LEFT JOIN clientes  c ON c.id_cliente  = p.cliente_id
+    LEFT JOIN empleados e ON e.id_empleado = p.empleado_id
     LEFT JOIN orders           o  ON o.pedido_id   = p.id_pedido
     LEFT JOIN detalle_pedido dp ON dp.pedido_id   = p.id_pedido
     LEFT JOIN productos      pr ON pr.id_producto = dp.producto_id
